@@ -185,7 +185,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG — replace with your key before deploying
 // ─────────────────────────────────────────────────────────────────────────────
-const API_KEY = "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";
+const PROXY_URL = "https://compare-docs.vercel.app/api/claude";
 
 const DOCS = [
   { id:"quote",       label:"Quote",             required:true,  color:"#2563EB" },
@@ -387,9 +387,9 @@ Return ONLY valid JSON:
 }
 
 async function callClaude(sys, user, maxTok=1000) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(PROXY_URL, {
     method: "POST",
-    headers: { "Content-Type":"application/json", "x-api-key":API_KEY, "anthropic-version":"2023-06-01" },
+    headers: { "Content-Type":"application/json" },
     body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:maxTok, system:sys, messages:[{role:"user",content:user}] }),
   });
   if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d?.error?.message||`API ${res.status}`); }
