@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CompareDocs — InLight AI</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+    :root {
+      --navy:   #0F2340;
+      --navy2:  #1A3A5F;
+      --navy3:  #2D5A8E;
+      --quote:  #2563EB;
+      --binder: #16A34A;
+      --invoice:#7C3AED;
+      --app:    #D97706;
+      --border: #E2E8F0;
+      --bg:     #F7F9FC;
+      --card:   #FFFFFF;
+      --text:   #0F2340;
+      --muted:  #64748B;
+      --small:  #94A3B8;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      padding: 0 40px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 0 rgba(255,255,255,.06);
+    }
+    .header-brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .header-logo {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, #3B82F6, #1E40AF);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-logo svg { color: white; }
+    .header-name { font-size: 15px; font-weight: 700; color: white; letter-spacing: -.01em; }
+    .header-tag  { font-size: 11px; color: rgba(255,255,255,.4); margin-left: 2px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .header-status {
+      font-size: 12px; color: rgba(255,255,255,.5);
+      font-family: 'DM Mono', monospace;
+    }
+    #btn-reset {
+      font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500;
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.8); border-radius: 6px; padding: 5px 12px;
+      cursor: pointer; transition: all .15s; display: none;
+    }
+    #btn-reset:hover { background: rgba(255,255,255,.18); }
+
+    /* ── Main layout ── */
+    .main { max-width: 1000px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    /* ── Tip bar ── */
+    .tip-bar {
+      background: #FEF9EC; border: 1px solid #FDE68A;
+      border-radius: 10px; padding: 12px 16px; margin-bottom: 24px;
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 13px; color: #78350F; line-height: 1.65;
+    }
+    .tip-bar svg { flex-shrink: 0; color: #D97706; margin-top: 1px; }
+    .tip-bar strong { font-weight: 600; }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--small); margin-bottom: 12px;
+    }
+
+    /* ── Slots grid ── */
+    .slots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 640px) { .slots { grid-template-columns: 1fr; } }
+
+    .slot {
+      background: var(--card); border-radius: 12px;
+      border: 2px solid var(--border); overflow: hidden;
+      transition: border-color .2s, box-shadow .2s;
+      position: relative;
+    }
+    .slot.drag-over {
+      border-color: var(--slot-color);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--slot-color) 12%, transparent);
+    }
+    .slot.has-doc { border-color: color-mix(in srgb, var(--slot-color) 35%, transparent); }
+
+    .slot-stripe { height: 3px; background: var(--slot-color); }
+    .slot-body   { padding: 14px 16px; }
+
+    .slot-label-row {
+      display: flex; align-items: center; gap: 9px; margin-bottom: 12px;
+    }
+    .slot-icon {
+      width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; font-family: 'DM Mono', monospace;
+      background: color-mix(in srgb, var(--slot-color) 10%, white);
+      color: var(--slot-color);
+      border: 1px solid color-mix(in srgb, var(--slot-color) 20%, transparent);
+    }
+    .slot-name { font-size: 13px; font-weight: 700; color: var(--slot-color); }
+    .slot-sub  { font-size: 11px; color: var(--small); margin-top: 1px; }
+    .slot-badge {
+      margin-left: auto; font-size: 9px; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+    }
+    .badge-req { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+    .badge-opt { background: #F1F5F9; color: var(--small); border: 1px solid var(--border); }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 1.5px dashed var(--border); border-radius: 9px;
+      padding: 20px 14px; text-align: center; cursor: pointer;
+      transition: all .15s;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .drop-zone:hover, .slot.drag-over .drop-zone {
+      border-color: var(--slot-color);
+      background: color-mix(in srgb, var(--slot-color) 4%, white);
+    }
+    .drop-zone input { display: none; }
+    .dz-icon { color: var(--border); transition: color .15s; }
+    .slot.drag-over .dz-icon, .drop-zone:hover .dz-icon { color: var(--slot-color); }
+    .dz-text { font-size: 13px; font-weight: 500; color: #475569; }
+    .dz-sub  { font-size: 11px; color: var(--small); font-family: 'DM Mono', monospace; }
+
+    /* Loaded state */
+    .slot-loaded {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .loaded-file {
+      display: flex; align-items: center; gap: 8px;
+      background: color-mix(in srgb, var(--slot-color) 6%, white);
+      border: 1px solid color-mix(in srgb, var(--slot-color) 18%, transparent);
+      border-radius: 8px; padding: 10px 12px;
+    }
+    .loaded-file svg { color: var(--slot-color); flex-shrink: 0; }
+    .loaded-filename { font-size: 12px; font-weight: 600; flex: 1; word-break: break-all; color: var(--text); }
+    .loaded-chars { font-size: 10px; color: var(--small); font-family: 'DM Mono', monospace; white-space: nowrap; }
+    .loaded-remove { background: none; border: none; cursor: pointer; color: var(--small); font-size: 14px; padding: 0; transition: color .15s; line-height: 1; }
+    .loaded-remove:hover { color: #EF4444; }
+
+    .paste-link {
+      font-size: 11px; color: var(--small); background: none; border: none;
+      cursor: pointer; font-family: 'DM Sans', sans-serif; padding: 4px 0 0;
+      text-decoration: underline; text-underline-offset: 2px;
+      transition: color .15s; text-align: left;
+    }
+    .paste-link:hover { color: var(--navy2); }
+
+    /* ── Action bar ── */
+    .action-bar {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; flex-wrap: wrap;
+    }
+    .action-note { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .action-note.warn { color: #B45309; }
+    .action-note.good { color: #15803D; }
+    .spin {
+      display: inline-block; width: 14px; height: 14px; vertical-align: middle;
+      border: 2px solid var(--border); border-top-color: var(--navy2);
+      border-radius: 50%; animation: spin .7s linear infinite; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #btn-compare {
+      font-size: 14px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+      background: var(--navy); color: white; border: none;
+      border-radius: 9px; padding: 11px 32px; cursor: pointer;
+      transition: all .15s; white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(15,35,64,.25);
+    }
+    #btn-compare:hover:not(:disabled) { background: var(--navy2); }
+    #btn-compare:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Error ── */
+    .err-bar {
+      background: #FEF2F2; border: 1px solid #FECACA;
+      border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+    }
+    .err-t { font-size: 13px; font-weight: 600; color: #B91C1C; margin-bottom: 4px; }
+    .err-m { font-size: 13px; color: #7F1D1D; line-height: 1.6; }
+    .err-tip { font-size: 12px; color: #B45309; margin-top: 7px; padding-top: 7px; border-top: 1px solid #FECACA; line-height: 1.55; }
+
+    /* ── Results ── */
+    .results { display: flex; flex-direction: column; gap: 16px; }
+
+    .result-banner {
+      border-radius: 12px; padding: 20px 22px;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .result-icon {
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; border: 2px solid;
+      background: rgba(255,255,255,.7);
+    }
+    .result-status  { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+    .result-summary { font-size: 14px; line-height: 1.75; }
+    .result-docs    { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .rdoc {
+      font-size: 11px; font-family: 'DM Mono', monospace;
+      background: rgba(255,255,255,.6); border: 1px solid rgba(0,0,0,.08);
+      padding: 2px 8px; border-radius: 4px; color: #374151;
+    }
+
+    .next-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    .next-head {
+      padding: 12px 18px; border-bottom: 1px solid #F1F5F9;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--small);
+    }
+    .next-list { padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .next-row  { display: flex; gap: 11px; align-items: flex-start; font-size: 13px; color: var(--text); line-height: 1.65; }
+    .n-num {
+      width: 22px; height: 22px; border-radius: 50%; background: var(--navy);
+      color: white; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+
+    .disc-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    .disc-head {
+      background: #F8FAFC; border-bottom: 1px solid var(--border);
+      padding: 12px 18px; display: flex; align-items: center; gap: 10px;
+    }
+    .disc-head-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .count-badge {
+      font-size: 10px; font-weight: 700; font-family: 'DM Mono', monospace;
+      letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 5px;
+    }
+
+    .disc-item { padding: 16px 18px; border-bottom: 1px solid #F8FAFC; }
+    .disc-item:last-child { border-bottom: none; }
+
+    .disc-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 11px; }
+    .sev {
+      font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 4px; font-family: 'DM Mono', monospace;
+    }
+    .sev-critical { background: #450A0A; color: #FCA5A5; }
+    .sev-high     { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+    .sev-medium   { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+    .sev-low      { background: #F8FAFC; color: var(--small); border: 1px solid var(--border); }
+    .disc-field   { font-size: 14px; font-weight: 700; flex: 1; }
+    .act-tag      { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 4px; white-space: nowrap; margin-left: auto; }
+
+    .disc-vals { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .dval { background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 10px 12px; }
+    .dval.problem { background: #FEF2F2; border-color: #FECACA; }
+    .dval-lbl { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 5px; }
+    .dval-val { font-size: 12px; font-family: 'DM Mono', monospace; line-height: 1.5; word-break: break-word; color: var(--text); }
+    .dval.problem .dval-val { color: #B91C1C; font-weight: 500; }
+    .dval-null { color: var(--small); font-style: italic; }
+
+    .guidance {
+      display: flex; gap: 8px; align-items: flex-start;
+      background: #EFF6FF; border: 1px solid #BFDBFE;
+      border-radius: 8px; padding: 10px 13px;
+      font-size: 12px; color: #1E40AF; line-height: 1.65;
+    }
+    .guidance svg { flex-shrink: 0; color: #2563EB; margin-top: 1px; }
+
+    .all-ok { text-align: center; padding: 44px 20px; }
+    .ao-ring {
+      width: 56px; height: 56px; background: #F0FDF4; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 14px; font-size: 22px; color: #16A34A;
+      border: 2px solid #BBF7D0;
+    }
+    .all-ok h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .all-ok p  { font-size: 13px; color: var(--muted); }
+
+    /* ── Paste modal ── */
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 300;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal {
+      background: white; border-radius: 14px; width: 100%; max-width: 540px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.2); overflow: hidden;
+    }
+    .modal-head { padding: 18px 20px 14px; font-size: 14px; font-weight: 700; border-bottom: 1px solid #F1F5F9; }
+    .modal-hint { margin: 14px 20px 0; font-size: 12px; color: var(--muted); background: #F8FAFC; border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; line-height: 1.6; }
+    .modal-ta {
+      display: block; width: calc(100% - 40px); margin: 12px 20px;
+      min-height: 180px; background: #F8FAFC; border: 1.5px solid var(--border);
+      border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 12px;
+      color: var(--text); padding: 12px; resize: vertical; outline: none;
+      line-height: 1.65; transition: border-color .15s;
+    }
+    .modal-ta:focus { border-color: var(--navy2); background: white; }
+    .modal-ta::placeholder { color: #CBD5E1; }
+    .modal-foot { padding: 12px 20px 18px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #F1F5F9; }
+    .btn-cancel  { font-size: 13px; background: white; border: 1px solid var(--border); border-radius: 7px; padding: 8px 16px; cursor: pointer; color: var(--muted); font-family: 'DM Sans', sans-serif; transition: all .15s; }
+    .btn-cancel:hover { border-color: #94A3B8; }
+    .btn-ok { font-size: 13px; font-weight: 600; background: var(--navy); color: white; border: none; border-radius: 7px; padding: 8px 18px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background .15s; }
+    .btn-ok:hover:not(:disabled) { background: var(--navy2); }
+    .btn-ok:disabled { opacity: .35; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+    </div>
+    <span class="header-name">CompareDocs</span>
+    <span class="header-tag">by InLight AI</span>
+  </div>
+  <div class="header-right">
+    <span class="header-status" id="header-status"></span>
+    <button id="btn-reset" onclick="resetAll()">Start Over</button>
+  </div>
+</div>
+
+<!-- Paste modal -->
+<div class="modal-bg" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head" id="modal-title">Paste document text</div>
+    <div class="modal-hint">Open the document → Select All (Ctrl+A) → Copy (Ctrl+C) → Paste below (Ctrl+V)</div>
+    <textarea class="modal-ta" id="modal-ta" placeholder="Paste document text here…"></textarea>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-ok" id="modal-ok" onclick="commitPaste()">Use this text</button>
+    </div>
+  </div>
+</div>
+
+<div class="main" id="main"></div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const PROXY = "https://compare-docs.vercel.app/api/claude";
+
+const DOCS = [
+  { id:"quote",       label:"Quote",             sub:"From underwriter", required:true,  icon:"Q", color:"var(--quote)"   },
+  { id:"binder",      label:"Binder",            sub:"From underwriter", required:true,  icon:"B", color:"var(--binder)"  },
+  { id:"invoice",     label:"Invoice",           sub:"From underwriter", required:true,  icon:"I", color:"var(--invoice)" },
+  { id:"application", label:"ACORD Application", sub:"What you submitted",required:false,icon:"A", color:"var(--app)"     },
+];
+const DMAP = Object.fromEntries(DOCS.map(d=>[d.id,d]));
+
+const ACTIONS = {
+  fix_in_binder:       { label:"Fix in Binder",       bg:"#FEF2F2", color:"#B91C1C" },
+  fix_in_quote:        { label:"Fix in Quote",         bg:"#FEF2F2", color:"#B91C1C" },
+  contact_underwriter: { label:"Contact Underwriter",  bg:"#FFFBEB", color:"#B45309" },
+  verify_with_insured: { label:"Verify with Insured",  bg:"#EFF6FF", color:"#1D4ED8" },
+  review:              { label:"Review",               bg:"#F8FAFC", color:"#64748B"  },
+};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let S = {
+  slots: {},       // { id: { filename, text } }
+  phase: "idle",   // idle | comparing | results
+  analysis: null,
+  error: null,
+  pasteTarget: null,
+};
+
+// ─── Text extraction ──────────────────────────────────────────────────────────
+async function extractFile(file) {
+  const n = file.name.toLowerCase();
+  if (n.endsWith(".txt")) {
+    try { return { text: await file.text() }; } catch(e) { return { err: e.message }; }
+  }
+  if (n.endsWith(".pdf")) {
+    return new Promise(resolve => {
+      const r = new FileReader();
+      r.onerror = () => resolve({ err: "Could not read file." });
+      r.onload = async e => {
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
+          let out = "";
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const pg = await pdf.getPage(i);
+            const c  = await pg.getTextContent();
+            out += c.items.map(s=>s.str).join(" ") + "\n";
+          }
+          const t = out.trim();
+          if (!t) resolve({ err: "Scanned PDF — no text layer. Use Paste Text instead." });
+          else resolve({ text: t });
+        } catch(e) { resolve({ err: `PDF error: ${e.message}` }); }
+      };
+      r.readAsArrayBuffer(file);
+    });
+  }
+  if (n.endsWith(".docx")) {
+    return new Promise(resolve => {
+      const r = new FileReader();
+      r.onerror = () => resolve({ err: "Could not read file." });
+      r.onload = async e => {
+        try {
+          const res = await window.mammoth.extractRawText({ arrayBuffer: e.target.result });
+          const t = res.value?.trim();
+          if (!t) resolve({ err: "File appears empty." });
+          else resolve({ text: t });
+        } catch(e) { resolve({ err: `DOCX error: ${e.message}` }); }
+      };
+      r.readAsArrayBuffer(file);
+    });
+  }
+  try { return { text: await file.text() }; }
+  catch(e) { return { err: "Unsupported file type." }; }
+}
+
+// ─── Load file into slot ──────────────────────────────────────────────────────
+async function loadFile(slotId, file) {
+  const { text, err } = await extractFile(file);
+  if (err) {
+    S.error = `${file.name}: ${err}`;
+    render(); return;
+  }
+  S.error = null;
+  S.slots[slotId] = { filename: file.name, text };
+  S.analysis = null;
+  render();
+}
+
+// ─── Paste ────────────────────────────────────────────────────────────────────
+function openPaste(slotId) {
+  S.pasteTarget = slotId;
+  document.getElementById("modal-title").textContent = `Paste ${DMAP[slotId].label} text`;
+  document.getElementById("modal-ta").value = "";
+  document.getElementById("modal").style.display = "flex";
+  setTimeout(() => document.getElementById("modal-ta").focus(), 50);
+}
+function closeModal() { document.getElementById("modal").style.display = "none"; S.pasteTarget = null; }
+function commitPaste() {
+  const t = document.getElementById("modal-ta").value.trim();
+  if (!t || !S.pasteTarget) return;
+  S.slots[S.pasteTarget] = { filename: "pasted text", text: t };
+  S.analysis = null; S.error = null;
+  closeModal(); render();
+}
+document.getElementById("modal-ta").addEventListener("input", () => {
+  document.getElementById("modal-ok").disabled = !document.getElementById("modal-ta").value.trim();
+});
+
+// ─── Compare ──────────────────────────────────────────────────────────────────
+async function runComparison() {
+  S.phase = "comparing"; S.analysis = null; S.error = null; render();
+
+  const ids  = DOCS.map(d=>d.id).filter(id => S.slots[id]?.text?.length > 20);
+  const lbls = ids.map(id => DMAP[id].label);
+  const docs = ids.map(id =>
+    `=== ${DMAP[id].label.toUpperCase()} (${S.slots[id].filename}) ===\n${S.slots[id].text}`
+  ).join("\n\n");
+
+  const sys = `You are an expert insurance broker's assistant. Compare: ${lbls.join(", ")}.
+PRIORITIES: 1) Quote vs Binder must match exactly. 2) Invoice vs Binder — premium/fees/payment. 3) Application vs Quote — was it quoted correctly.
+Check ALL material fields: Named Insured, Additional Insureds, Policy Number, Effective Date, Expiration Date, Coverage Type/Form, Each Limit, Aggregate Limit, Deductible, Premium, Taxes, Fees, Payment Terms, Endorsements, Exclusions.
+Return ONLY valid JSON:
+{"overall_status":"clear"|"review"|"conflict","summary":"<2-3 sentences for a broker>","discrepancies":[{"field":"<n>","severity":"critical"|"high"|"medium"|"low",${ids.map(id=>`"${id}":"<value or null>"`).join(",")},"problem_doc":"<doc id>","action":"fix_in_binder"|"fix_in_quote"|"contact_underwriter"|"verify_with_insured"|"review","guidance":"<one sentence: what broker should do>"}],"critical_count":<n>,"next_steps":["<step 1>","<step 2>"]}`;
+
+  try {
+    const res = await fetch(PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:3000, system:sys, messages:[{role:"user",content:docs}] }),
+    });
+    if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d?.error?.message||`API ${res.status}`); }
+    const d = await res.json();
+    const raw = d.content?.[0]?.text ?? "";
+    const result = JSON.parse(raw.replace(/```json\n?|```/g,"").trim());
+    S.analysis = { ...result, comparedIds: ids };
+    S.phase = "results";
+  } catch(e) {
+    S.error = e.message; S.phase = "idle";
+  }
+  render();
+}
+
+function resetAll() {
+  S = { slots:{}, phase:"idle", analysis:null, error:null, pasteTarget:null };
+  render();
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+
+  const loadedCount = DOCS.filter(d => S.slots[d.id]?.text?.length > 20).length;
+  const reqReady    = DOCS.filter(d=>d.required).every(d => S.slots[d.id]?.text?.length > 20);
+
+  // Header status
+  document.getElementById("header-status").textContent =
+    loadedCount ? `${loadedCount} of ${DOCS.length} docs loaded` : "";
+  document.getElementById("btn-reset").style.display =
+    loadedCount > 0 || S.analysis ? "block" : "none";
+
+  // Tip
+  if (!loadedCount && S.phase === "idle") {
+    main.appendChild(makeTip());
+  }
+
+  // Error
+  if (S.error) main.appendChild(makeErr());
+
+  // Slots
+  const slotWrap = el("div", "");
+  slotWrap.innerHTML = `<div class="section-label">Drop documents into each slot — drag PDFs directly from Outlook</div>`;
+  const grid = el("div", "slots");
+  DOCS.forEach(doc => grid.appendChild(makeSlot(doc)));
+  slotWrap.appendChild(grid);
+  main.appendChild(slotWrap);
+
+  // Action bar
+  if (S.phase !== "comparing") main.appendChild(makeActBar(reqReady));
+  if (S.phase === "comparing") {
+    const bar = el("div","action-bar");
+    bar.innerHTML = `<div class="action-note"><span class="spin"></span>Analyzing documents — about 15 seconds…</div>`;
+    main.appendChild(bar);
+  }
+
+  // Results
+  if (S.phase === "results" && S.analysis) {
+    const wrap = el("div","results");
+    wrap.appendChild(makeBanner());
+    if (S.analysis.next_steps?.length) wrap.appendChild(makeNextSteps());
+    wrap.appendChild(makeDiscPanel());
+    main.appendChild(wrap);
+  }
+}
+
+// ─── Slot builder ─────────────────────────────────────────────────────────────
+function makeSlot(doc) {
+  const slot = el("div", `slot${S.slots[doc.id] ? " has-doc" : ""}`);
+  slot.style.setProperty("--slot-color", doc.color);
+
+  // Drag events
+  let dragCounter = 0;
+  slot.addEventListener("dragenter", e => { e.preventDefault(); dragCounter++; slot.classList.add("drag-over"); });
+  slot.addEventListener("dragleave", () => { dragCounter--; if (!dragCounter) slot.classList.remove("drag-over"); });
+  slot.addEventListener("dragover",  e => e.preventDefault());
+  slot.addEventListener("drop", async e => {
+    e.preventDefault(); dragCounter = 0; slot.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) await loadFile(doc.id, file);
+  });
+
+  slot.innerHTML = `<div class="slot-stripe"></div>`;
+  const body = el("div","slot-body");
+
+  // Label row
+  const labelRow = el("div","slot-label-row");
+  labelRow.innerHTML = `
+    <div class="slot-icon">${doc.icon}</div>
+    <div>
+      <div class="slot-name">${doc.label}</div>
+      <div class="slot-sub">${doc.sub}</div>
+    </div>
+    <span class="slot-badge ${doc.required?"badge-req":"badge-opt"}">${doc.required?"Required":"Optional"}</span>`;
+  body.appendChild(labelRow);
+
+  const loaded = S.slots[doc.id];
+  if (loaded) {
+    const lw = el("div","slot-loaded");
+    lw.innerHTML = `
+      <div class="loaded-file">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="loaded-filename">${esc(loaded.filename)}</span>
+        <span class="loaded-chars">${loaded.text.length.toLocaleString()} chars</span>
+        <button class="loaded-remove" onclick="removeSlot('${doc.id}')" title="Remove">✕</button>
+      </div>`;
+    body.appendChild(lw);
+  } else {
+    // Drop zone
+    const dz = el("div","drop-zone");
+    dz.innerHTML = `
+      <input type="file" accept=".pdf,.docx,.txt" id="fi-${doc.id}"/>
+      <div class="dz-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="dz-text">Drop file or click to browse</div>
+      <div class="dz-sub">PDF · DOCX · TXT</div>`;
+    dz.addEventListener("click", () => document.getElementById(`fi-${doc.id}`).click());
+    dz.querySelector("input").addEventListener("change", async e => {
+      if (e.target.files[0]) { await loadFile(doc.id, e.target.files[0]); e.target.value=""; }
+    });
+    body.appendChild(dz);
+    const pl = el("button","paste-link");
+    pl.textContent = "Can't drop a file? Paste text instead →";
+    pl.onclick = () => openPaste(doc.id);
+    body.appendChild(pl);
+  }
+
+  slot.appendChild(body);
+  return slot;
+}
+
+function removeSlot(id) { delete S.slots[id]; S.analysis = null; render(); }
+
+// ─── Other UI builders ────────────────────────────────────────────────────────
+function makeTip() {
+  const d = el("div","tip-bar");
+  d.innerHTML = `
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <div><strong>Drag PDFs directly from Outlook desktop</strong> — open each email, drag the attachment icon from the reading pane into the correct slot below. Do this for your Quote email, then your Binder/Invoice email. Or click any slot to browse for a file.</div>`;
+  return d;
+}
+
+function makeErr() {
+  const d = el("div","err-bar");
+  d.innerHTML = `<div class="err-t">Could not read file</div><div class="err-m">${esc(S.error)}</div>
+    <div class="err-tip">If this is a scanned PDF with no selectable text, use the <strong>Paste Text</strong> link on the slot instead.</div>`;
+  return d;
+}
+
+function makeActBar(ready) {
+  const reqMissing = DOCS.filter(d=>d.required && !S.slots[d.id]).map(d=>d.label);
+  const bar = el("div","action-bar");
+  const note = el("div", `action-note ${!ready?"warn":Object.keys(S.slots).length===4?"good":""}` );
+  note.textContent = !ready
+    ? `Still needed: ${reqMissing.join(", ")}`
+    : Object.keys(S.slots).filter(id=>S.slots[id]).length === 4
+    ? "All 4 documents loaded — ready to compare."
+    : "Quote, Binder, and Invoice loaded. ACORD Application is optional.";
+  const btn = document.createElement("button");
+  btn.id = "btn-compare"; btn.textContent = "Compare Documents";
+  btn.disabled = !ready; btn.onclick = runComparison;
+  bar.appendChild(note); bar.appendChild(btn);
+  return bar;
+}
+
+function makeBanner() {
+  const a = S.analysis;
+  const cfg = {
+    clear:    { color:"#15803D", bg:"#F0FDF4", border:"#BBF7D0", icon:"✓" },
+    review:   { color:"#B45309", bg:"#FFFBEB", border:"#FDE68A", icon:"!" },
+    conflict: { color:"#B91C1C", bg:"#FEF2F2", border:"#FECACA", icon:"✕" },
+  }[a.overall_status] ?? { color:"#B45309", bg:"#FFFBEB", border:"#FDE68A", icon:"!" };
+  const n = a.discrepancies?.length ?? 0;
+  const d = el("div","result-banner");
+  d.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};`;
+  d.innerHTML = `
+    <div class="result-icon" style="border-color:${cfg.color};color:${cfg.color}">${cfg.icon}</div>
+    <div>
+      <div class="result-status" style="color:${cfg.color}">
+        ${n===0?"All Clear":n<=2?"Review Needed":"Conflicts Found"}
+        ${n>0?`<span style="font-weight:400;font-size:13px;opacity:.8"> — ${n} issue${n>1?"s":""}</span>`:""}
+      </div>
+      <div class="result-summary" style="color:${n===0?"#166534":"#374151"}">${esc(a.summary)}</div>
+      <div class="result-docs">${(a.comparedIds||[]).map(id=>`<span class="rdoc">${DMAP[id]?.label||id}</span>`).join("")}</div>
+    </div>`;
+  return d;
+}
+
+function makeNextSteps() {
+  const card = el("div","next-card");
+  card.innerHTML = `<div class="next-head">Recommended Next Steps</div>`;
+  const list = el("div","next-list");
+  S.analysis.next_steps.forEach((s,i) => {
+    const row = el("div","next-row");
+    row.innerHTML = `<div class="n-num">${i+1}</div><div>${esc(s)}</div>`;
+    list.appendChild(row);
+  });
+  card.appendChild(list); return card;
+}
+
+function makeDiscPanel() {
+  const a = S.analysis;
+  const card = el("div","disc-card");
+  if (!a.discrepancies?.length) {
+    card.innerHTML = `<div class="all-ok"><div class="ao-ring">✓</div><h3>All documents align</h3><p>No material discrepancies found. You're clear to proceed.</p></div>`;
+    return card;
+  }
+  const sorted = [...a.discrepancies].sort((x,y)=>
+    ["critical","high","medium","low"].indexOf(x.severity)-["critical","high","medium","low"].indexOf(y.severity));
+  const critBadge = a.critical_count > 0
+    ? `<span class="count-badge" style="background:#450A0A;color:#FCA5A5">${a.critical_count} critical</span>` : "";
+  const head = el("div","disc-head");
+  head.innerHTML = `<span class="disc-head-title">Discrepancies</span>${critBadge}<span class="count-badge" style="background:#F1F5F9;color:#374151">${sorted.length} total</span>`;
+  card.appendChild(head);
+
+  sorted.forEach(d => {
+    const act = ACTIONS[d.action] ?? ACTIONS.review;
+    const item = el("div","disc-item");
+    const vals = a.comparedIds.map(id => {
+      const v = d[id]; const bad = d.problem_doc === id;
+      return `<div class="dval${bad?" problem":""}">
+        <div class="dval-lbl" style="color:${DMAP[id]?.color?.replace("var(--","").replace(")","") ? "": "#64748B"}">${DMAP[id]?.label||id}${bad?" ⚠":""}</div>
+        <div class="dval-val${(!v||v==="null")?" dval-null":""}">${v&&v!=="null"?esc(v):"not stated"}</div>
+      </div>`;
+    }).join("");
+    item.innerHTML = `
+      <div class="disc-top">
+        <span class="sev sev-${d.severity}">${d.severity}</span>
+        <span class="disc-field">${esc(d.field)}</span>
+        <span class="act-tag" style="background:${act.bg};color:${act.color}">${act.label}</span>
+      </div>
+      <div class="disc-vals">${vals}</div>
+      ${d.guidance?`<div class="guidance"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span><strong>Action:</strong> ${esc(d.guidance)}</span></div>`:""}`;
+    card.appendChild(item);
+  });
+  return card;
+}
+
+function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// Init
+render();
+</script>
+</body>
+</html>
